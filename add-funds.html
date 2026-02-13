@@ -99,7 +99,7 @@
             </div>
         </div>
 
-        <div class="payment-card" onclick="openPayment('Binance Pay', 'ID: 1216432984', 'binance')">
+        <div class="payment-card" onclick="openPayment('Binance Pay', 'ID: 12345678', 'binance')">
             <div class="method-icon binance"><i class="fab fa-bitcoin"></i></div>
             <div class="method-info">
                 <h3>Binance Pay (USDT)</h3>
@@ -188,65 +188,80 @@
     }
 
     async function confirmDeposit() {
-        const name = document.getElementById('mTitle').innerText;
-        const fromAccount = document.getElementById('user-account').value;
-        const amount = document.getElementById('user-amount').value;
-        const time = document.getElementById('user-time').value;
-        const user = auth.currentUser;
+    const name = document.getElementById('mTitle').innerText;
+    const fromAccount = document.getElementById('user-account').value;
+    const amount = document.getElementById('user-amount').value;
+    const time = document.getElementById('user-time').value;
+    const user = auth.currentUser;
+    const btn = document.querySelector('.btn-confirm'); // تحديد الزر للتحكم فيه
 
-        // التأكد من تسجيل الدخول
-        if (!user) {
-            Swal.fire('خطأ', 'يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
+    if (!user) {
+        Swal.fire('خطأ', 'يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
 
-        if(!fromAccount || !amount || !time) {
-            Swal.fire('تنبيه', 'يرجى ملء كافة البيانات المطلوبة', 'warning');
-            return;
-        }
+    if(!fromAccount || !amount || !time) {
+        Swal.fire('تنبيه', 'يرجى ملء كافة البيانات المطلوبة', 'warning');
+        return;
+    }
 
+    try {
+        // تعطيل الزر لمنع الإرسال المتكرر
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري المعالجة...';
+
+        Swal.fire({ title: 'جاري إرسال الطلب...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        // محاولة جلب الاسم بذكاء
+        let userName = "مستخدم جديد";
         try {
-            Swal.fire({ title: 'جاري إرسال الطلب...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-            // جلب بيانات المستخدم الإضافية (مثل الاسم) من مجموعة Users
             const userDoc = await db.collection("Users").doc(user.uid).get();
-            const userName = userDoc.exists ? userDoc.data().name : "مستخدم غير معروف";
+            if (userDoc.exists && userDoc.data().name) {
+                userName = userDoc.data().name;
+            } else {
+                userName = user.email.split('@')[0];
+            }
+        } catch (e) { console.log("استخدام بيانات افتراضية"); }
 
-            // حفظ البيانات في Firestore
-            await db.collection("DepositRequests").add({
-                userId: user.uid, // ضمان إرسال k6mb... (المعرف الصحيح)
-                uid: user.uid,    // إضافة هذا الحقل كاحتياط لزيادة التوافق مع الأدمن
-                userName: userName,
-                userEmail: user.email,
-                method: name,
-                fromAccount: fromAccount,
-                amount: parseFloat(amount),
-                transferTime: time,
-                status: "pending",
-                createdAt: new Date().toISOString()
-            });
+        // إرسال البيانات لـ Firestore
+        await db.collection("DepositRequests").add({
+            userId: user.uid,
+            uid: user.uid,
+            userName: userName,
+            userEmail: user.email,
+            method: name,
+            fromAccount: fromAccount,
+            amount: parseFloat(amount),
+            transferTime: time,
+            status: "pending",
+            createdAt: new Date().toISOString()
+        });
 
-            Swal.fire({
-                title: 'تم الإرسال بنجاح!',
-                text: 'وصل طلبك للإدارة، سيتم مراجعة التحويل وإضافة الرصيد لحسابك خلال دقائق.',
-                icon: 'success',
-                confirmButtonColor: '#10b981'
-            }).then(() => {
-                closeModal();
-                document.getElementById('user-account').value = "";
-                document.getElementById('user-amount').value = "";
-            });
+        Swal.fire({
+            title: 'تم الإرسال بنجاح!',
+            text: 'سيتم مراجعة طلبك وإضافة الرصيد فور التأكد.',
+            icon: 'success'
+        }).then(() => {
+            closeModal();
+            // إعادة تفعيل الزر وتنظيف الحقول
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> إرسال الطلب';
+            document.getElementById('user-account').value = "";
+            document.getElementById('user-amount').value = "";
+        });
 
-        } catch (e) {
-            console.error("Error:", e);
-            Swal.fire('خطأ', 'فشل في إرسال الطلب، تأكد من اتصال الإنترنت', 'error');
-        }
+    } catch (e) {
+        console.error("Firebase Error:", e);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> إرسال الطلب';
+        
+        let errorMsg = "حدث خطأ غير متوقع، حاول مرة أخرى";
+        if (e.code === "permission-denied") errorMsg = "ليس لديك صلاحية لإرسال الطلب";
+        
+        Swal.fire('فشل الإرسال', errorMsg, 'error');
     }
+} // نهاية الدالة
 
-    // إغلاق عند الضغط خارج المودال
-    window.onclick = function(e) {
-        if (e.target.id === 'paymentModal') closeModal();
-    }
 </script>
 
 </body>
