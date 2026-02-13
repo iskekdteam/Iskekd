@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISKEKD | Ultra Services</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --dark: #0f172a;
+            --border-soft: #e2e8f0;
+            --bg-page: #f8fafc;
+            --text-muted: #64748b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Kufi Arabic', sans-serif; }
+        body { background-color: var(--bg-page); color: var(--dark); overflow-x: hidden; }
+
+        header {
+            background: var(--dark); height: 55px; display: flex;
+            align-items: center; justify-content: space-between; padding: 0 20px;
+            position: sticky; top: 0; z-index: 1000;
+        }
+        .logo { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 0.5px; }
+
+        .main-container { max-width: 650px; margin: 20px auto; padding: 0 15px; }
+
+        .platform-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+            margin-bottom: 15px;
+        }
+        @media (min-width: 500px) { .platform-grid { grid-template-columns: repeat(8, 1fr); } }
+
+        .p-item {
+            background: #fff; border: 1px solid var(--border-soft); height: 45px;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .p-item:hover { border-color: var(--primary); transform: scale(1.05); }
+        .p-item.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+        .card { 
+            background: #fff; border-radius: 12px; border: 1px solid var(--border-soft);
+            padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 20px;
+        }
+        
+        .search-area { margin-bottom: 15px; position: relative; }
+        .search-area input {
+            width: 100%; padding: 10px 35px 10px 10px; border: 1px solid var(--border-soft);
+            border-radius: 8px; font-size: 13px; background: #fff; outline: none;
+        }
+        .search-area i { position: absolute; right: 12px; top: 12px; font-size: 12px; color: var(--text-muted); }
+
+        .f-group { margin-bottom: 15px; }
+        .f-label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+        select {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-soft);
+            border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--dark);
+            background: #fdfdfd; outline: none;
+        }
+
+        /* ستايل قائمة المنتجات الجديدة */
+        .cat-section { margin-top: 20px; }
+        .cat-header { 
+            font-size: 14px; font-weight: 800; color: var(--primary); 
+            margin: 15px 0 10px; padding-right: 10px; border-right: 3px solid var(--primary);
+        }
+        .product-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .product-row {
+            background: #fff; padding: 12px 15px; border-radius: 10px;
+            border: 1px solid var(--border-soft); display: flex;
+            justify-content: space-between; align-items: center;
+            cursor: pointer; transition: 0.2s;
+        }
+        .product-row:hover { border-color: var(--primary); background: #f0f7ff; transform: translateX(-5px); }
+        .p-name { font-size: 13px; font-weight: 600; color: var(--dark); }
+        .p-price { font-size: 12px; font-weight: 800; color: #10b981; }
+
+        .side-menu {
+            position: fixed; top: 0; right: -260px; width: 260px; height: 100vh;
+            background: var(--dark); z-index: 2000; transition: 0.3s; padding: 20px;
+        }
+        .side-menu.open { right: 0; }
+        .side-link {
+            display: flex; align-items: center; gap: 10px; color: #94a3b8;
+            text-decoration: none; padding: 10px; font-size: 13px; font-weight: 600;
+            border-radius: 6px; margin-bottom: 5px;
+        }
+        .side-link:hover, .side-link.active { background: rgba(255,255,255,0.05); color: #fff; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">ISKEKD</div>
+    <div onclick="toggleSide()" style="color:#fff; cursor:pointer;"><i class="fas fa-stream"></i></div>
+</header>
+
+<div class="side-menu" id="side">
+    <div style="color:#fff; margin-bottom:30px; font-weight:800; border-bottom:1px solid #1e293b; padding-bottom:10px;">لوحة التحكم</div>
+    <a href="dashboard.html" class="side-link"><i class="fas fa-home"></i> الرئيسية</a>
+    <a href="services.html" class="side-link active"><i class="fas fa-plus-circle"></i> طلب جديد</a>
+    <a href="orders.html" class="side-link"><i class="fas fa-history"></i> طلباتي</a>
+    <a href="add-funds.html" class="side-link"><i class="fas fa-wallet"></i> شحن الرصيد</a>
+    <div style="position:absolute; bottom:20px; width:calc(100% - 40px);">
+        <a href="index.html" class="side-link" style="color:#f87171;"><i class="fas fa-sign-out-alt"></i> خروج</a>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="platform-grid">
+        <div class="p-item active" onclick="plat(this, 'all')"><i class="fas fa-border-all"></i></div>
+        <div class="p-item" onclick="plat(this, 'telegram')"><i class="fab fa-telegram-plane"></i></div>
+        <div class="p-item" onclick="plat(this, 'instagram')"><i class="fab fa-instagram"></i></div>
+        <div class="p-item" onclick="plat(this, 'tiktok')"><i class="fab fa-tiktok"></i></div>
+        <div class="p-item" onclick="plat(this, 'facebook')"><i class="fab fa-facebook-f"></i></div>
+        <div class="p-item" onclick="plat(this, 'youtube')"><i class="fab fa-youtube"></i></div>
+        <div class="p-item" onclick="plat(this, 'web')"><i class="fas fa-globe"></i></div>
+        <div class="p-item" onclick="plat(this, 'reddit')"><i class="fab fa-reddit"></i></div>
+    </div>
+
+    <div class="card">
+        <div class="search-area">
+            <i class="fas fa-search"></i>
+            <input type="text" id="qSearch" placeholder="ابحث عن خدمة..." onkeyup="renderProducts()">
+        </div>
+
+        <div class="f-group">
+            <span class="f-label">فلترة حسب الفئة</span>
+            <select id="cat" onchange="renderProducts()"></select>
+        </div>
+
+        <div class="f-group">
+            <span class="f-label">فلترة حسب الخدمة</span>
+            <select id="ser" onchange="renderProducts()"></select>
+        </div>
+    </div>
+
+    <div id="products-container"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+    apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
+    authDomain: "iskekd-1.firebaseapp.com",
+    projectId: "iskekd-1",
+    storageBucket: "iskekd-1.firebasestorage.app",
+    messagingSenderId: "665943430831",
+    appId: "1:665943430831:web:3c85370fcbff3166c2a65a"
+};
+
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    
+    let allData = [];
+    let currentPlat = 'all';
+    let userBalance = 0;
+    let currentUser = null;
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            onSnapshot(doc(db, "Users", user.uid), (snap) => {
+                if (snap.exists()) {
+                    userBalance = snap.data().balance || 0;
+                }
+            });
+            loadServices();
+        } else {
+            window.location.href = "login.html";
+        }
+    });
+
+    function loadServices() {
+        onSnapshot(collection(db, "Services"), (s) => {
+            allData = [];
+            const cats = new Set();
+            s.forEach(d => {
+                const o = {id: d.id, ...d.data()};
+                allData.push(o);
+                if(o.category) cats.add(o.category);
+            });
+            const el = document.getElementById('cat');
+            if(el) {
+                el.innerHTML = '<option value="all">كل الأقسام</option>';
+                cats.forEach(v => el.innerHTML += `<option value="${v}">${v}</option>`);
+            }
+            renderProducts();
+        });
+    }
+
+    window.renderProducts = function() {
+        const catVal = document.getElementById('cat').value;
+        const searchVal = document.getElementById('qSearch').value.toLowerCase();
+        const container = document.getElementById('products-container');
+        const serSelect = document.getElementById('ser');
+        container.innerHTML = '';
+        
+        let filtered = allData.filter(x => {
+            const matchPlat = currentPlat === 'all' || 
+                             (x.platform && x.platform.toLowerCase().includes(currentPlat.toLowerCase())) || 
+                             (x.category && x.category.toLowerCase().includes(currentPlat.toLowerCase()));
+            
+            const matchCat = catVal === 'all' || x.category === catVal;
+            const matchSearch = x.name.toLowerCase().includes(searchVal) || x.id.toLowerCase().includes(searchVal);
+            
+            return matchPlat && matchCat && matchSearch;
+        });
+
+        if(serSelect) {
+            serSelect.innerHTML = '<option value="all">كل الخدمات</option>';
+            filtered.forEach(x => serSelect.innerHTML += `<option value="${x.id}">${x.name}</option>`);
+        }
+
+        const groups = filtered.reduce((acc, obj) => {
+            const groupName = obj.category || "عام";
+            acc[groupName] = acc[groupName] || [];
+            acc[groupName].push(obj);
+            return acc;
+        }, {});
+
+        for (const cat in groups) {
+            let section = `<div class="cat-section"><div class="cat-header"><i class="fas fa-layer-group"></i> ${cat}</div><div class="product-list">`;
+            groups[cat].forEach(p => {
+                section += `<div class="product-row" onclick="openPurchaseModal('${p.id}')">
+                                <div class="p-name">${p.name}</div>
+                                <div class="p-price">${p.price} EGP</div>
+                            </div>`;
+            });
+            section += `</div></div>`;
+            container.innerHTML += section;
+        }
+    };
+
+    window.openPurchaseModal = function(id) {
+        const p = allData.find(x => x.id === id);
+        if (!p) return;
+
+        if (!document.getElementById('swal-custom-styles')) {
+            const style = document.createElement('style');
+            style.id = 'swal-custom-styles';
+            style.innerHTML = `
+                .my-swal-popup { border-radius: 20px !important; font-family: 'Noto Kufi Arabic', sans-serif; }
+                .my-confirm-btn { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important; border-radius: 10px !important; padding: 10px 25px !important; font-weight: 800 !important; }
+                .swal-input-custom { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; margin-bottom: 12px; outline: none; font-size: 14px; text-align: right; background: #f8fafc; box-sizing: border-box; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const calcCost = () => {
+            const qty = document.getElementById('swal-qty').value || 0;
+            const total = (qty / 1000) * p.price;
+            const costDisplay = document.getElementById('total-cost');
+            const costBox = document.getElementById('cost-box');
+            const errorMsg = document.getElementById('balance-error');
+            const confirmBtn = Swal.getConfirmButton();
+
+            if(costDisplay) costDisplay.innerText = total.toFixed(2);
+            
+            if (total > userBalance) {
+                costBox.style.background = "#ef4444";
+                errorMsg.style.display = "block";
+                confirmBtn.innerText = "شحن رصيد الآن";
+                confirmBtn.setAttribute('data-action', 'recharge');
+            } else {
+                costBox.style.background = "#1e2746";
+                errorMsg.style.display = "none";
+                confirmBtn.innerText = "تأكيد الطلب";
+                confirmBtn.removeAttribute('data-action');
+            }
+        };
+
+        Swal.fire({
+            title: `<div style="font-size:18px; font-weight:900; color:#1e2746;">${p.name}</div>`,
+            html: `
+                <div style="text-align:right; direction:rtl; font-family:'Noto Kufi Arabic';">
+                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:15px;">
+                        <div style="background:#f0f7ff; padding:10px 5px; border-radius:12px; border:1px solid #e0e7ff; text-align:center;">
+                            <i class="fas fa-bolt" style="color:#f59e0b; font-size:14px; margin-bottom:4px;"></i>
+                            <div style="font-size:9px; color:#64748b;">السرعة</div>
+                            <div style="font-size:10px; font-weight:700;">${p.speed || 'سريع'}</div>
+                        </div>
+                        <div style="background:#f0fff4; padding:10px 5px; border-radius:12px; border:1px solid #dcfce7; text-align:center;">
+                            <i class="fas fa-shield-alt" style="color:#10b981; font-size:14px; margin-bottom:4px;"></i>
+                            <div style="font-size:9px; color:#64748b;">الضمان</div>
+                            <div style="font-size:10px; font-weight:700;">${p.refill || 'لا يوجد'}</div>
+                        </div>
+                        <div style="background:#fffcf0; padding:10px 5px; border-radius:12px; border:1px solid #fef3c7; text-align:center;">
+                            <i class="fas fa-check-circle" style="color:#4f46e5; font-size:14px; margin-bottom:4px;"></i>
+                            <div style="font-size:9px; color:#64748b;">الثبات</div>
+                            <div style="font-size:10px; font-weight:700;">${p.stability || 'مرتفع'}</div>
+                        </div>
+                    </div>
+
+                    <label style="font-size:12px; font-weight:700; color:#64748b;">رابط الحساب / المنشور</label>
+                    <input type="text" id="swal-link" class="swal-input-custom" placeholder="https://...">
+
+                    <label style="font-size:12px; font-weight:700; color:#64748b;">الكمية المطلوبة</label>
+                    <input type="number" id="swal-qty" class="swal-input-custom" placeholder="أقل كمية 100">
+
+                    <div id="cost-box" style="background:#1e2746; color:white; padding:15px; border-radius:12px; text-align:center; transition: 0.3s;">
+                        <div style="font-size:11px; opacity:0.8;">التكلفة الإجمالية</div>
+                        <div style="font-size:22px; font-weight:900;"><span id="total-cost">0.00</span> <small style="font-size:12px;">EGP</small></div>
+                    </div>
+                    <div id="balance-error" style="color:#ef4444; font-size:11px; font-weight:700; text-align:center; margin-top:10px; display:none;">
+                        عذراً، رصيدك غير كافٍ لإتمام هذا الطلب
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'تأكيد الطلب',
+            cancelButtonText: 'إلغاء',
+            customClass: { popup: 'my-swal-popup', confirmButton: 'my-confirm-btn' },
+            didOpen: () => { 
+                document.getElementById('swal-qty').addEventListener('input', calcCost); 
+            },
+            preConfirm: () => {
+                const btn = Swal.getConfirmButton();
+                if (btn.getAttribute('data-action') === 'recharge') { 
+                    window.location.href = "add-funds.html"; 
+                    return false; 
+                }
+                const link = document.getElementById('swal-link').value;
+                const qty = document.getElementById('swal-qty').value;
+                const cost = (qty / 1000) * p.price;
+                if (!link || qty <= 0) { 
+                    Swal.showValidationMessage('يرجى ملء البيانات بشكل صحيح'); 
+                    return false; 
+                }
+                return { link, qty, cost };
+            }
+        }).then((result) => { 
+            if (result.isConfirmed) processOrder(result.value, p.name); 
+        });
+    };
+
+    async function processOrder(data, serviceName) {
+    try {
+        Swal.fire({ 
+            title: 'جاري تنفيذ طلبك...', 
+            allowOutsideClick: false, 
+            didOpen: () => Swal.showLoading() 
+        });
+
+        // 1. خصم الرصيد من المستخدم
+        const userRef = db.collection("Users").doc(currentUser.uid);
+        await userRef.update({ 
+            balance: userBalance - data.cost 
+        });
+
+        // 2. محاولة جلب "رقم المورد" من كوليكشن Services
+        let pID = null;
+        try {
+            // بنبحث بالاسم عن الخدمة
+            const serviceSnap = await db.collection("Services").where("name", "==", serviceName).get();
+            if (!serviceSnap.empty) {
+                pID = serviceSnap.docs[0].data().providerID || null;
+            }
+        } catch (searchError) {
+            // لو المجلد مش موجود أو فيه مشكلة في البحث، بنكمل عادي عشان الطلب ميتعطلش
+            console.log("تنبيه: مجلد الخدمات غير جاهز، سيتم تسجيل الطلب يدوياً.");
+        }
+
+        // 3. تسجيل الطلب في كوليكشن Orders (مع إضافة pID لو وجدناه)
+        await db.collection("Orders").add({
+            userId: currentUser.uid,
+            email: currentUser.email || 'user',
+            service: serviceName,
+            providerID: pID, // لو البحث فشل هيكون null وده مش بيعمل أخطاء
+            link: data.link,
+            quantity: data.qty,
+            cost: data.cost,
+            status: "pending",
+            createdAt: new Date().toISOString()
+        });
+
+        // 4. رسالة النجاح وتحديث واجهة المستخدم
+        Swal.fire('تم بنجاح', 'تم تسجيل طلبك وخصم الرصيد من محفظتك', 'success');
+        
+        userBalance -= data.cost;
+        if(document.getElementById('user-balance')) {
+            document.getElementById('user-balance').innerText = userBalance.toFixed(2);
+        }
+
+    } catch (e) { 
+        console.error("Order Error:", e);
+        Swal.fire('خطأ', 'حدثت مشكلة أثناء الطلب، تأكد من رصيدك وحاول ثانية', 'error'); 
+    }
+}
+
+
+
+    window.plat = (el, type) => {
+        document.querySelectorAll('.p-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentPlat = type;
+        renderProducts();
+    };
+    
+    window.toggleSide = () => {
+        const side = document.getElementById('side');
+        if(side) side.classList.toggle('open');
+    };
+</script>
+</body>
+</html>

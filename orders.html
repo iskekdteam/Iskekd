@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISKEKD | تتبع طلباتي</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg: #020617;
+            --card: #0f172a;
+            --primary: #3b82f6;
+            --text-dim: #94a3b8;
+            --border: rgba(255, 255, 255, 0.08);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Kufi Arabic', sans-serif; }
+        body { background: var(--bg); color: white; padding: 15px; min-height: 100vh; }
+
+        .container { max-width: 700px; margin: 0 auto; }
+        
+        /* الهيدر المحترف */
+        .header-box { margin-bottom: 25px; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        .back-btn { color: white; text-decoration: none; background: var(--card); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--border); }
+        
+        .refund-notice { 
+            background: rgba(16, 185, 129, 0.1); 
+            border: 1px dashed var(--success); 
+            padding: 10px; border-radius: 12px; 
+            font-size: 11px; color: #d1fae5; 
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        /* كارت الطلب المطور */
+        .order-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 18px;
+            margin-bottom: 20px;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .order-title { font-size: 15px; font-weight: 800; color: #fff; }
+        
+        /* الحالات */
+        .status-pill { padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 800; }
+        .status-pending { background: rgba(148, 163, 184, 0.1); color: #94a3b8; }
+        .status-processing { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .status-inprogress { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-completed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .status-refunded { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        /* شريط التقدم */
+        .progress-container { margin: 15px 0; background: rgba(255,255,255,0.05); height: 8px; border-radius: 10px; position: relative; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), #8b5cf6); border-radius: 10px; transition: 1s ease-in-out; width: 0%; }
+        .progress-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 5px; }
+
+        /* التفاصيل */
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
+        .detail-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+        .detail-item i { color: var(--primary); font-size: 14px; }
+        .link-area { grid-column: span 2; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; text-decoration: none; color: var(--primary); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .no-orders { text-align: center; margin-top: 80px; }
+        .no-orders i { font-size: 60px; color: var(--border); margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header-box">
+            <div class="header">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <a href="dashboard.html" class="back-btn"><i class="fas fa-chevron-right"></i></a>
+                    <h2 style="font-size: 20px;">تتبع طلباتي</h2>
+                </div>
+            </div>
+            <div class="refund-notice">
+                <i class="fas fa-shield-check" style="font-size: 18px; color: var(--success);"></i>
+                <span>ضمان ISKEKD: في حال فشل تنفيذ الطلب لأي سبب تقني، سيتم استرداد كامل المبلغ إلى محفظتك تلقائياً.</span>
+            </div>
+        </div>
+
+        <div id="orders-list">
+            <div style="text-align:center; padding:50px;">
+                <i class="fas fa-circle-notch fa-spin" style="font-size:30px; color:var(--primary);"></i>
+                <p style="margin-top:10px; font-size:12px; color:var(--text-dim);">جاري تحديث الحالات من السيرفر...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+    apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
+    authDomain: "iskekd-1.firebaseapp.com",
+    projectId: "iskekd-1",
+    storageBucket: "iskekd-1.firebasestorage.app",
+    messagingSenderId: "665943430831",
+    appId: "1:665943430831:web:3c85370fcbff3166c2a65a"
+};
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        auth.onAuthStateChanged(user => {
+            if (user) { loadMyOrders(user.uid); } 
+            else { window.location.href = 'login.html'; }
+        });
+
+        function loadMyOrders(uid) {
+            // استخدام Snapshot للتحديث اللحظي بدون ريفريش
+            db.collection("Orders").where("userId", "==", uid)
+            .onSnapshot(snap => {
+                const container = document.getElementById('orders-list');
+                if (snap.empty) {
+                    container.innerHTML = `<div class="no-orders"><i class="fas fa-box-open"></i><p style="color:var(--text-dim)">لا توجد طلبات نشطة حالياً</p></div>`;
+                    return;
+                }
+
+                let html = "";
+                // ترتيب يدوي من الأحدث
+                const sorted = snap.docs.sort((a,b) => new Date(b.data().createdAt) - new Date(a.data().createdAt));
+
+                                sorted.forEach(doc => {
+                    const o = doc.data();
+                    const statusData = getStatusDetails(o.status);
+                    let progress = o.progress || statusData.defProgress;
+
+                    // إضافة حقول العدادات لو موجودة في فايربيز (اختياري للأدمن)
+                    const startCount = o.start_count ? `<span><i class="fas fa-play"></i> البدء: ${o.start_count}</span>` : "";
+                    const remains = o.remains ? `<span><i class="fas fa-pause"></i> المتبقي: ${o.remains}</span>` : "";
+
+                    html += `
+                    <div class="order-card">
+                        <div class="order-header">
+                            <div class="order-title">${o.service || 'خدمة غير معروفة'}</div>
+                            <span class="status-pill ${statusData.class}">${statusData.text}</span>
+                        </div>
+
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="progress-info">
+                            <span>${statusData.desc}</span>
+                            <span>${progress}%</span>
+                        </div>
+
+                        <div class="details-grid">
+                            <a href="${o.link}" target="_blank" class="link-area" title="${o.link}">
+                                <i class="fas fa-link"></i> ${o.link}
+                            </a>
+                            <div class="detail-item"><i class="fas fa-hashtag"></i> الكمية: ${o.quantity}</div>
+                            <div class="detail-item"><i class="fas fa-coins"></i> التكلفة: ${o.cost.toFixed(2)} EGP</div>
+                            <div class="detail-item"><i class="fas fa-calendar-day"></i> التاريخ: ${new Date(o.createdAt).toLocaleDateString('ar-EG')}</div>
+                            <div class="detail-item"><i class="fas fa-ticket-alt"></i> رقم الطلب: ${doc.id.substring(0,8)}</div>
+                            
+                            ${startCount ? `<div class="detail-item">${startCount}</div>` : ""}
+                            ${remains ? `<div class="detail-item">${remains}</div>` : ""}
+                        </div>
+
+                        <a href="https://wa.me/201104452609?text=استفسار عن الطلب رقم: ${doc.id}" 
+                           style="display: block; text-align: center; margin-top: 15px; font-size: 11px; color: var(--text-dim); text-decoration: none; border: 1px solid var(--border); padding: 5px; border-radius: 8px;">
+                           <i class="fab fa-whatsapp"></i> تواجه مشكلة في هذا الطلب؟ تواصل معنا
+                        </a>
+                    </div>`;
+                });
+
+                container.innerHTML = html;
+            });
+        }
+
+        function getStatusDetails(status) {
+            switch(status) {
+                case 'pending': 
+                    return { text: 'قيد الانتظار', class: 'status-pending', desc: 'بانتظار مراجعة الإدارة', defProgress: 10 };
+                case 'processing': 
+                    return { text: 'جاري المعالجة', class: 'status-processing', desc: 'يتم الآن تجهيز طلبك في السيرفر', defProgress: 35 };
+                case 'inprogress': 
+                    return { text: 'قيد التنفيذ', class: 'status-inprogress', desc: 'يتم إرسال العدد الآن.. لا تغير الرابط', defProgress: 65 };
+                case 'completed': 
+                    return { text: 'مكتمل', class: 'status-completed', desc: 'تم تنفيذ الطلب بنجاح 100%', defProgress: 100 };
+                case 'canceled': 
+                case 'refunded':
+                    return { text: 'مسترجع', class: 'status-refunded', desc: 'فشل التنفيذ وتم رد المبلغ لمحفظتك', defProgress: 0 };
+                default: 
+                    return { text: 'قيد الانتظار', class: 'status-pending', desc: 'يتم فحص الطلب', defProgress: 5 };
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /services.html
+Allow: /support.html
+
+# منع أرشفة ملفات النظام الداخلية إن وجدت
+Disallow: /js/
+Disallow: /css/
+
+# رابط خريطة الموقع لمساعدة العناكب
+Sitemap: https://iskekd.store/sitemap.xml

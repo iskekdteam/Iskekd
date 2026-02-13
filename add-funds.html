@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISKEKD | شحن الرصيد</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg: #020617;
+            --card: #0f172a;
+            --primary: #3b82f6;
+            --accent: #10b981;
+            --border: rgba(255, 255, 255, 0.08);
+            --text-dim: #94a3b8;
+            --error: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Kufi Arabic', sans-serif; }
+        body { background: var(--bg); color: white; padding: 20px; min-height: 100vh; }
+        .container { max-width: 500px; margin: 0 auto; }
+
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
+        .back-btn { color: white; text-decoration: none; width: 40px; height: 40px; background: var(--card); border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); }
+
+        .payment-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 20px; padding: 18px; margin-bottom: 15px;
+            transition: 0.3s; cursor: pointer; display: flex; align-items: center; gap: 15px;
+        }
+        .payment-card:hover { border-color: var(--primary); transform: scale(1.02); }
+        .payment-card.disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+        
+        .method-icon { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .v-cash { background: #ff0000; color: white; }
+        .instapay { background: #4a148c; color: white; }
+        .binance { background: #f3ba2f; color: black; }
+
+        .method-info h3 { font-size: 14px; margin-bottom: 2px; }
+        .method-info p { font-size: 10px; color: var(--text-dim); }
+
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; padding: 15px;
+        }
+        .modal-content {
+            background: var(--card); padding: 25px; border-radius: 25px; width: 100%; max-width: 420px;
+            border: 1px solid var(--border); position: relative;
+        }
+        .copy-box {
+            background: #020617; padding: 15px; border-radius: 15px; margin: 15px 0;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--primary);
+        }
+        
+        .input-group { text-align: right; margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 5px; margin-right: 5px; }
+        .input-group input {
+            width: 100%; background: #020617; border: 1px solid var(--border); padding: 12px;
+            border-radius: 12px; color: white; outline: none; transition: 0.3s; font-size: 13px; text-align: right;
+        }
+        .input-group input:focus { border-color: var(--primary); }
+
+        .btn-confirm {
+            background: var(--accent); color: white; border: none; padding: 15px;
+            border-radius: 15px; width: 100%; font-weight: 800; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <a href="dashboard.html" class="back-btn"><i class="fas fa-chevron-right"></i></a>
+            <h2>شحن الرصيد</h2>
+        </div>
+
+        <div class="payment-card" onclick="openPayment('Vodafone Cash', '01104452609', 'v-cash')">
+            <div class="method-icon v-cash"><i class="fas fa-mobile-alt"></i></div>
+            <div class="method-info">
+                <h3>فودافون كاش - Vodafone Cash</h3>
+                <p>إيداع يدوي - أرسل البيانات للمراجعة</p>
+            </div>
+        </div>
+
+        <div class="payment-card disabled" onclick="showDisabledAlert()">
+            <div class="method-icon instapay"><i class="fas fa-bolt"></i></div>
+            <div class="method-info">
+                <h3>إنستا باي - InstaPay</h3>
+                <p>الحالة: معطلة حالياً وتفتح قريباً</p>
+            </div>
+        </div>
+
+        <div class="payment-card" onclick="openPayment('Binance Pay', 'ID: 12345678', 'binance')">
+            <div class="method-icon binance"><i class="fab fa-bitcoin"></i></div>
+            <div class="method-info">
+                <h3>Binance Pay (USDT)</h3>
+                <p>شحن عن طريق معرف بينانس</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <h3 id="mTitle" style="text-align: center;">تفاصيل الدفع</h3>
+            <p style="font-size: 11px; color: var(--text-dim); text-align: center; margin-top: 8px;">حول للرقم التالي ثم املأ البيانات:</p>
+            
+            <div class="copy-box">
+                <span id="mAccount" style="font-weight: 800; color: var(--primary); letter-spacing: 1px;">----------</span>
+                <i class="fas fa-copy" onclick="copyText()" style="cursor: pointer;"></i>
+            </div>
+
+            <div class="input-group">
+                <label>رقمك الذي حولت منه</label>
+                <input type="number" id="user-account" placeholder="أدخل رقمك هنا">
+            </div>
+
+            <div class="input-group">
+                <label>المبلغ المرسل</label>
+                <input type="number" id="user-amount" placeholder="0.00">
+            </div>
+
+            <div class="input-group">
+                <label>وقت وتاريخ التحويل</label>
+                <input type="datetime-local" id="user-time">
+            </div>
+
+            <button class="btn-confirm" onclick="confirmDeposit()">
+                <i class="fas fa-paper-plane"></i>
+                إرسال الطلب 
+            </button>
+            
+            <p onclick="closeModal()" style="text-align: center; margin-top: 15px; font-size: 12px; color: var(--error); cursor: pointer; font-weight: bold;">إلغاء</p>
+        </div>
+    </div>
+
+    <script>
+    // --- Firebase Configuration ---
+    const firebaseConfig = {
+    apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
+    authDomain: "iskekd-1.firebaseapp.com",
+    projectId: "iskekd-1",
+    storageBucket: "iskekd-1.firebasestorage.app",
+    messagingSenderId: "665943430831",
+    appId: "1:665943430831:web:3c85370fcbff3166c2a65a"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    function openPayment(name, account, type) {
+        document.getElementById('mTitle').innerText = name;
+        document.getElementById('mAccount').innerText = account;
+        document.getElementById('paymentModal').style.display = 'flex';
+        
+        // ضبط الوقت الحالي تلقائياً
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('user-time').value = now.toISOString().slice(0,16);
+    }
+
+    function closeModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    function showDisabledAlert() {
+        Swal.fire({
+            title: 'الخدمة معطلة',
+            text: 'خدمة إنستا باي معطلة حالياً وستعود للعمل قريباً.',
+            icon: 'info',
+            confirmButtonColor: '#4a148c'
+        });
+    }
+
+    function copyText() {
+        const text = document.getElementById('mAccount').innerText;
+        navigator.clipboard.writeText(text);
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'تم النسخ', showConfirmButton: false, timer: 1000 });
+    }
+
+    async function confirmDeposit() {
+        const name = document.getElementById('mTitle').innerText;
+        const fromAccount = document.getElementById('user-account').value;
+        const amount = document.getElementById('user-amount').value;
+        const time = document.getElementById('user-time').value;
+        const user = auth.currentUser;
+
+        // التأكد من تسجيل الدخول
+        if (!user) {
+            Swal.fire('خطأ', 'يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+
+        if(!fromAccount || !amount || !time) {
+            Swal.fire('تنبيه', 'يرجى ملء كافة البيانات المطلوبة', 'warning');
+            return;
+        }
+
+        try {
+            Swal.fire({ title: 'جاري إرسال الطلب...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            // جلب بيانات المستخدم الإضافية (مثل الاسم) من مجموعة Users
+            const userDoc = await db.collection("Users").doc(user.uid).get();
+            const userName = userDoc.exists ? userDoc.data().name : "مستخدم غير معروف";
+
+            // حفظ البيانات في Firestore
+            await db.collection("DepositRequests").add({
+                userId: user.uid, // ضمان إرسال k6mb... (المعرف الصحيح)
+                uid: user.uid,    // إضافة هذا الحقل كاحتياط لزيادة التوافق مع الأدمن
+                userName: userName,
+                userEmail: user.email,
+                method: name,
+                fromAccount: fromAccount,
+                amount: parseFloat(amount),
+                transferTime: time,
+                status: "pending",
+                createdAt: new Date().toISOString()
+            });
+
+            Swal.fire({
+                title: 'تم الإرسال بنجاح!',
+                text: 'وصل طلبك للإدارة، سيتم مراجعة التحويل وإضافة الرصيد لحسابك خلال دقائق.',
+                icon: 'success',
+                confirmButtonColor: '#10b981'
+            }).then(() => {
+                closeModal();
+                document.getElementById('user-account').value = "";
+                document.getElementById('user-amount').value = "";
+            });
+
+        } catch (e) {
+            console.error("Error:", e);
+            Swal.fire('خطأ', 'فشل في إرسال الطلب، تأكد من اتصال الإنترنت', 'error');
+        }
+    }
+
+    // إغلاق عند الضغط خارج المودال
+    window.onclick = function(e) {
+        if (e.target.id === 'paymentModal') closeModal();
+    }
+</script>
+
+</body>
+</html>

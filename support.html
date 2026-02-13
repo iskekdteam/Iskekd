@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الدعم الفني | ISKEKD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg: #020617;
+            --card: #0f172a;
+            --primary: #3b82f6;
+            --text-dim: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background: var(--bg); color: white;
+            font-family: 'Noto Kufi Arabic', sans-serif;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+        }
+
+        .support-card {
+            background: var(--card);
+            width: 100%; max-width: 550px;
+            border-radius: 24px; padding: 30px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-box { text-align: center; margin-bottom: 30px; }
+        .header-box i { font-size: 40px; color: var(--primary); margin-bottom: 15px; }
+        
+        .input-group { margin-bottom: 20px; text-align: right; }
+        .input-group label { display: block; font-size: 13px; margin-bottom: 8px; color: var(--text-dim); }
+        
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%; background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border); border-radius: 12px;
+            padding: 12px; color: white; outline: none; transition: 0.3s;
+            font-family: inherit;
+        }
+
+        .input-group input:focus, .input-group textarea:focus { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
+
+        .btn-submit {
+            width: 100%; padding: 15px; border-radius: 12px;
+            border: none; background: var(--primary); color: white;
+            font-weight: 800; cursor: pointer; transition: 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+
+        .btn-submit:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        .or-divider {
+            margin: 25px 0; display: flex; align-items: center;
+            color: var(--text-dim); font-size: 12px;
+        }
+        .or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); margin: 0 10px; }
+
+        .whatsapp-fast {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; color: #25d366; text-decoration: none;
+            font-weight: 700; font-size: 14px;
+        }
+
+        .back-btn {
+            display: block; text-align: center; margin-top: 20px;
+            color: var(--text-dim); text-decoration: none; font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="support-card">
+    <div class="header-box">
+        <i class="fas fa-paper-plane"></i>
+        <h2>أرسل تذكرة دعم</h2>
+        <p style="font-size: 12px; color: var(--text-dim);">اكتب تفاصيل مشكلتك وسيقوم فريقنا بالرد عليك في أقرب وقت</p>
+    </div>
+
+    <form id="supportForm">
+        <div class="input-group">
+            <label>نوع المشكلة</label>
+            <select id="ticketType" required>
+                <option value="شحن رصيد">مشكلة في شحن الرصيد</option>
+                <option value="نقص متابعين">نقص في طلب منفذ</option>
+                <option value="تأخر طلب">تأخر تنفيذ الطلب</option>
+                <option value="أخرى">استفسار آخر</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>رقم الطلب (إن وجد)</label>
+            <input type="text" id="orderID" placeholder="مثال: #5a2b1">
+        </div>
+
+        <div class="input-group">
+            <label>تفاصيل المشكلة</label>
+            <textarea id="message" rows="5" placeholder="اشرح لنا ما حدث معك..." required></textarea>
+        </div>
+
+        <button type="submit" class="btn-submit">
+            <i class="fas fa-share-square"></i> إرسال التذكرة
+        </button>
+    </form>
+
+    <div class="or-divider">أو تواصل فوري</div>
+
+    <a href="https://wa.me/201104452609" class="whatsapp-fast">
+        <i class="fab fa-whatsapp"></i> تحدث معنا عبر واتساب
+    </a>
+
+    <a href="dashboard.html" class="back-btn"><i class="fas fa-chevron-right"></i> العودة للرئيسية</a>
+</div>
+
+<script>
+    // بيانات الفايربيز الخاصة بك
+    const firebaseConfig = {
+        apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
+        authDomain: "iskekd-1.firebaseapp.com",
+        projectId: "iskekd-1",
+        storageBucket: "iskekd-1.firebasestorage.app",
+        messagingSenderId: "665943430831",
+        appId: "1:665943430831:web:3c85370fcbff3166c2a65a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    document.getElementById('supportForm').onsubmit = async (e) => {
+        e.preventDefault();
+        
+        const user = auth.currentUser;
+        if(!user) return Swal.fire('خطأ', 'يجب تسجيل الدخول أولاً', 'error');
+
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+
+        const ticketData = {
+            uid: user.uid,
+            email: user.email,
+            type: document.getElementById('ticketType').value,
+            orderID: document.getElementById('orderID').value,
+            message: document.getElementById('message').value,
+            status: 'open',
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            await db.collection("SupportTickets").add(ticketData);
+            Swal.fire('تم الإرسال!', 'استلمنا تذكرتك وسنرد عليك عبر البريد أو الواتساب', 'success');
+            e.target.reset();
+        } catch (err) {
+            Swal.fire('خطأ', 'لم نتمكن من إرسال رسالتك، حاول ثانية', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-share-square"></i> إرسال التذكرة';
+        }
+    };
+</script>
+
+</body>
+</html>
