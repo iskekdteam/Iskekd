@@ -347,70 +347,80 @@
         });
     };
 async function processOrder(data, serviceName) {
-    try {
-        // إظهار مؤشر التحميل
-        Swal.fire({ 
-            title: 'جاري تنفيذ طلبك...', 
-            allowOutsideClick: false, 
-            didOpen: () => Swal.showLoading() 
-        });
-
-        // 1. حساب الرصيد الجديد بدقة (تحويل لنوع Number لتجنب الأخطاء)
-        const newBalance = Number(userBalance) - Number(data.cost);
-        
-        if (newBalance < 0) {
-            throw new Error("عذراً، رصيدك غير كافٍ لإتمام العملية.");
-        }
-
-        // 2. تحديث الرصيد في قاعدة البيانات (الطريقة الحديثة)
-        const userRef = doc(db, "Users", currentUser.uid);
-        await updateDoc(userRef, { 
-            balance: newBalance 
-        });
-
-        // 3. محاولة جلب "رقم المورد" من كوليكشن Services
-        let pID = null;
         try {
-            // استخدام query و where بالطريقة الحديثة
-            const { query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
-            const q = query(collection(db, "Services"), where("name", "==", serviceName));
-            const serviceSnap = await getDocs(q);
-            
-            if (!serviceSnap.empty) {
-                pID = serviceSnap.docs[0].data().providerID || null;
+            Swal.fire({ 
+                title: 'جاري تنفيذ طلبك...', 
+                allowOutsideClick: false, 
+                didOpen: () => Swal.showLoading() 
+            });
+
+            // تأكد أن الرصيد رقم وليس نص
+            const currentBal = Number(userBalance);
+            const orderCost = Number(data.cost);
+
+            if (currentBal < orderCost) {
+                throw new Error("رصيدك الحالي غير كافٍ");
             }
-        } catch (searchError) {
-            console.log("تنبيه: فشل جلب ID المورد، سيتم التسجيل بدونه.");
+
+            // 1. تحديث الرصيد في Firestore (بالطريقة الحديثة)
+            const userRef = doc(db, "Users", currentUser.uid);
+            await updateDoc(userRef, { 
+                balance: currentBal - orderCost 
+            });
+
+            // 2. تسجيل الطلب في كوليكشن Orders
+            await addDoc(collection(db, "Orders"), {
+                userId: currentUser.uid,
+                email: currentUser.email || 'user',
+                service: serviceName,
+                link: data.link,
+                quantity: Number(data.qty),
+                cost: orderCost,
+                status: "pending",
+                createdAt: new Date().toISOString()
+            });
+
+            // 3. رسالة النجاح
+            Swal.fire('تم بنجاح', 'تم تسجيل طلبك بنجاح', 'success');
+            
+            // تحديث الرصيد في الواجهة
+            userBalance = currentBal - orderCost;
+            const balEl = document.getElementById('user-balance');
+            if(balEl) balEl.innerText = userBalance.toFixed(2);
+
+        } catch (e) { 
+            console.error("Order Error:", e);
+            Swal.fire('خطأ', e.message || 'حدثت مشكلة، حاول ثانية', 'error'); 
         }
-
-        // 4. تسجيل الطلب في كوليكشن Orders
-        await addDoc(collection(db, "Orders"), {
-            userId: currentUser.uid,
-            email: currentUser.email || 'user',
-            service: serviceName,
-            providerID: pID,
-            link: data.link,
-            quantity: Number(data.qty),
-            cost: Number(data.cost),
-            status: "pending",
-            createdAt: new Date().toISOString()
-        });
-
-        // 5. رسالة النجاح وتحديث الرصيد في الواجهة
-        Swal.fire('تم بنجاح', 'تم تسجيل طلبك بنجاح وخصم التكلفة', 'success');
-        
-        userBalance = newBalance; // تحديث المتغير المحلي
-        const balanceDisplay = document.getElementById('user-balance');
-        if(balanceDisplay) {
-            balanceDisplay.innerText = userBalance.toFixed(2);
-        }
-
-    } catch (e) { 
-        console.error("Order Error:", e);
-        Swal.fire('خطأ في العملية', e.message || 'حدث خطأ غير متوقع، حاول ثانية', 'error'); 
     }
-}
+
+    window.plat = (el, type) => {
+        document.querySelectorAll('.p-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentPlat = type;
+        renderProducts();
+    };
+    
+    window.toggleSide = () => {
+        const side = document.getElementById('side');
+        if(side) side.classList.toggle('open');
+    };
+
+
+
+
+
+    window.plat = (el, type) => {
+        document.querySelectorAll('.p-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+        currentPlat = type;
+        renderProducts();
+    };
+    
+    window.toggleSide = () => {
+        const side = document.getElementById('side');
+        if(side) side.classList.toggle('open');
+    };
 </script>
 </body>
 </html>
-    
