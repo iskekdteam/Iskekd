@@ -346,74 +346,71 @@
             if (result.isConfirmed) processOrder(result.value, p.name); 
         });
     };
-
-    async function processOrder(data, serviceName) {
+async function processOrder(data, serviceName) {
     try {
+        // إظهار مؤشر التحميل
         Swal.fire({ 
             title: 'جاري تنفيذ طلبك...', 
             allowOutsideClick: false, 
             didOpen: () => Swal.showLoading() 
         });
 
-        // 1. خصم الرصيد من المستخدم
-        const userRef = db.collection("Users").doc(currentUser.uid);
-        await userRef.update({ 
-            balance: userBalance - data.cost 
+        // 1. حساب الرصيد الجديد بدقة (تحويل لنوع Number لتجنب الأخطاء)
+        const newBalance = Number(userBalance) - Number(data.cost);
+        
+        if (newBalance < 0) {
+            throw new Error("عذراً، رصيدك غير كافٍ لإتمام العملية.");
+        }
+
+        // 2. تحديث الرصيد في قاعدة البيانات (الطريقة الحديثة)
+        const userRef = doc(db, "Users", currentUser.uid);
+        await updateDoc(userRef, { 
+            balance: newBalance 
         });
 
-        // 2. محاولة جلب "رقم المورد" من كوليكشن Services
+        // 3. محاولة جلب "رقم المورد" من كوليكشن Services
         let pID = null;
         try {
-            // بنبحث بالاسم عن الخدمة
-            const serviceSnap = await db.collection("Services").where("name", "==", serviceName).get();
+            // استخدام query و where بالطريقة الحديثة
+            const { query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+            const q = query(collection(db, "Services"), where("name", "==", serviceName));
+            const serviceSnap = await getDocs(q);
+            
             if (!serviceSnap.empty) {
                 pID = serviceSnap.docs[0].data().providerID || null;
             }
         } catch (searchError) {
-            // لو المجلد مش موجود أو فيه مشكلة في البحث، بنكمل عادي عشان الطلب ميتعطلش
-            console.log("تنبيه: مجلد الخدمات غير جاهز، سيتم تسجيل الطلب يدوياً.");
+            console.log("تنبيه: فشل جلب ID المورد، سيتم التسجيل بدونه.");
         }
 
-        // 3. تسجيل الطلب في كوليكشن Orders (مع إضافة pID لو وجدناه)
-        await db.collection("Orders").add({
+        // 4. تسجيل الطلب في كوليكشن Orders
+        await addDoc(collection(db, "Orders"), {
             userId: currentUser.uid,
             email: currentUser.email || 'user',
             service: serviceName,
-            providerID: pID, // لو البحث فشل هيكون null وده مش بيعمل أخطاء
+            providerID: pID,
             link: data.link,
-            quantity: data.qty,
-            cost: data.cost,
+            quantity: Number(data.qty),
+            cost: Number(data.cost),
             status: "pending",
             createdAt: new Date().toISOString()
         });
 
-        // 4. رسالة النجاح وتحديث واجهة المستخدم
-        Swal.fire('تم بنجاح', 'تم تسجيل طلبك وخصم الرصيد من محفظتك', 'success');
+        // 5. رسالة النجاح وتحديث الرصيد في الواجهة
+        Swal.fire('تم بنجاح', 'تم تسجيل طلبك بنجاح وخصم التكلفة', 'success');
         
-        userBalance -= data.cost;
-        if(document.getElementById('user-balance')) {
-            document.getElementById('user-balance').innerText = userBalance.toFixed(2);
+        userBalance = newBalance; // تحديث المتغير المحلي
+        const balanceDisplay = document.getElementById('user-balance');
+        if(balanceDisplay) {
+            balanceDisplay.innerText = userBalance.toFixed(2);
         }
 
     } catch (e) { 
         console.error("Order Error:", e);
-        Swal.fire('خطأ', 'حدثت مشكلة أثناء الطلب، تأكد من رصيدك وحاول ثانية', 'error'); 
+        Swal.fire('خطأ في العملية', e.message || 'حدث خطأ غير متوقع، حاول ثانية', 'error'); 
     }
 }
-
-
-
-    window.plat = (el, type) => {
-        document.querySelectorAll('.p-item').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-        currentPlat = type;
-        renderProducts();
-    };
-    
-    window.toggleSide = () => {
-        const side = document.getElementById('side');
-        if(side) side.classList.toggle('open');
-    };
 </script>
 </body>
 </html>
+    
