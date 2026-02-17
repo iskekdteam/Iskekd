@@ -293,10 +293,18 @@ onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
         else renderServices(allServices.filter(s => s.category.toLowerCase().includes(plat.toLowerCase())));
     };
 
-    window.searchServices = function() {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        renderServices(allServices.filter(s => s.name.toLowerCase().includes(term) || s.id.includes(term)));
-    };
+    window.searchServices = async () => {
+    const term = document.getElementById('searchInput').value.toLowerCase();
+    if(term.length < 3) return; // لا يبحث إلا بعد كتابة 3 حروف لتوفير الجهد
+
+    // البحث في أول 50 نتيجة فقط تطابق الاسم
+    const snapshot = await db.collection("Services")
+        .where("name", ">=", term)
+        .limit(50) 
+        .get();
+        
+    // رسم النتائج...
+};
 
     window.toggleMenu = () => {
         document.getElementById('sidebar').classList.toggle('active');
