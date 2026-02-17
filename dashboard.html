@@ -112,6 +112,18 @@
             box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
         }
         .my-cancel-btn { border-radius: 10px !important; font-weight: 700 !important; }
+.platform-item {
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    border-radius: 10px;
+}
+.platform-item:active {
+    transform: scale(0.9); /* تأثير الضغط */
+    background: #f0f0f0;
+}
+.platform-item img {
+    pointer-events: none; /* لمنع تداخل الضغط على الصورة نفسها */
+}
 
     </style>
 </head>
@@ -172,188 +184,12 @@
 </div>
 
 <div id="services-container"></div>
-
-<script type="module">
-    // تم إضافة addDoc و updateDoc هنا لضمان عمل حفظ الطلبات وخصم الرصيد
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    const firebaseConfig = {
-    apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
-    authDomain: "iskekd-1.firebaseapp.com",
-    projectId: "iskekd-1",
-    storageBucket: "iskekd-1.firebasestorage.app",
-    messagingSenderId: "665943430831",
-    appId: "1:665943430831:web:3c85370fcbff3166c2a65a"
-};
-
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    let allServices = [];
-
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            try {
-                // مراقبة بيانات المستخدم (الرصيد والاسم) لحظياً
-onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
-    if (userDoc.exists()) {
-        const userData = userDoc.data();
-        document.getElementById('myBalance').innerText = (userData.balance || 0).toFixed(2) + " EGP";
-        // إذا كنت تريد عرض اسم المستخدم في مكان ما
-        if(document.getElementById('userName')) {
-            document.getElementById('userName').innerText = userData.name || "مستخدم";
-        }
-    }
-});
-
-            } catch (e) { console.error(e); }
-            document.body.style.opacity = "1";
-            loadServices();
-        } else {
-            window.location.href = "login.html";
-        }
-    });
-
-    function loadServices() {
-        const q = query(collection(db, "Services"), orderBy("category", "asc"));
-        onSnapshot(q, (snap) => {
-            allServices = [];
-            const catFilter = document.getElementById('catFilter');
-            const categories = new Set();
-            
-            snap.forEach(doc => {
-                const data = doc.data();
-                allServices.push({ 
-                    id: doc.id, 
-                    ...data,
-                    price: parseFloat(data.price) || 0
-                });
-                if(data.category) categories.add(data.category);
-            });
-
-            catFilter.innerHTML = '<option value="all">كل التصنيفات</option>';
-            categories.forEach(cat => {
-                catFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
-            });
-
-            renderServices(allServices);
-            renderRandomServices(allServices); 
-        });
-    }
-
-    window.renderServices = function(data) {
-        const container = document.getElementById('services-container');
-        container.innerHTML = "";
-        let currentCat = "";
-
-        data.forEach(s => {
-            if(s.category !== currentCat) {
-                currentCat = s.category;
-                container.innerHTML += `<div class="cat-title-row"><i class="fas fa-layer-group"></i> ${s.category.toUpperCase()}</div>`;
-            }
-            container.innerHTML += `
-                <div class="service-row" onclick="core.openOrder('${s.id}', '${s.name}', ${s.price})">
-                    <div class="s-id">#${s.id.substring(0,4)}</div>
-                    <div class="s-name">${s.name}</div>
-                </div>
-            `;
-        });
-    };
-
-    window.renderRandomServices = function(data) {
-        const randomContainer = document.getElementById('random-container');
-        if(!randomContainer) return;
-        randomContainer.innerHTML = "";
-        const shuffled = [...data].sort(() => 0.5 - Math.random());
-        shuffled.slice(0, 3).forEach(s => {
-            randomContainer.innerHTML += `
-                <div class="service-row" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:8px;" onclick="core.openOrder('${s.id}', '${s.name}', ${s.price})">
-                    <div class="s-id"><i class="fas fa-bolt" style="color:#f59e0b"></i></div>
-                    <div class="s-name">${s.name} <br> <small style="color:#4f46e5">${s.category}</small></div>
-                </div>`;
-        });
-    };
-
-    window.filterByCategory = function() {
-        const val = document.getElementById('catFilter').value;
-        document.querySelectorAll('.p-icon').forEach(i => i.classList.remove('active'));
-        if(val === 'all') renderServices(allServices);
-        else renderServices(allServices.filter(s => s.category === val));
-    };
-
-    window.filterByPlatform = function(plat, el) {
-        document.querySelectorAll('.p-icon').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-        document.getElementById('catFilter').value = 'all';
-        if(plat === 'all') renderServices(allServices);
-        else renderServices(allServices.filter(s => s.category.toLowerCase().includes(plat.toLowerCase())));
-    };
-
-    window.searchServices = async () => {
-    const term = document.getElementById('searchInput').value.toLowerCase();
-    if(term.length < 3) return; // لا يبحث إلا بعد كتابة 3 حروف لتوفير الجهد
-
-    // البحث في أول 50 نتيجة فقط تطابق الاسم
-    const snapshot = await db.collection("Services")
-        .where("name", ">=", term)
-        .limit(20) 
-        .get();
-        
-    // رسم النتائج...
-};
-
-    window.toggleMenu = () => {
-        document.getElementById('sidebar').classList.toggle('active');
-        document.getElementById('overlay').classList.toggle('active');
-    };
-
-    window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
-
-    window.core = {
-        openOrder: async (id, name, price) => {
-            const s = allServices.find(item => item.id === id);
-            const currentBalance = parseFloat(document.getElementById('myBalance').innerText) || 0;
-
-            Swal.fire({
-                title: `<div style="font-size:16px; font-weight:900; color:var(--navy-bg);">${name}</div>`,
-                html: `
-                    <div style="text-align:right; direction:rtl; font-family:'Noto Kufi Arabic';">
-                        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:15px;">
-                            <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-bolt" style="color:#f59e0b; font-size:12px;"></i>
-                                <div style="font-size:9px; color:#64748b;">السرعة</div>
-                                <div style="font-size:10px; font-weight:700;">${s.speed || 'سريع'}</div>
-                            </div>
-                            <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-shield-alt" style="color:#10b981; font-size:12px;"></i>
-                                <div style="font-size:9px; color:#64748b;">الضمان</div>
-                                <div style="font-size:10px; font-weight:700;">${s.refill || 'لا يوجد'}</div>
-                            </div>
-                            <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-check-circle" style="color:#4f46e5; font-size:12px;"></i>
-                                <div style="font-size:9px; color:#64748b;">الثبات</div>
-                                <div style="font-size:10px; font-weight:700;">${s.stability || 'ثابت'}</div>
-                            </div>
-                        </div>
-
-                        <div style="background:#fff; border:1px solid var(--border-color); padding:12px; border-radius:12px;">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:12px;">
-                                <span style="color:#64748b;">سعر الـ 1000: <b style="color:#10b981;">${price} EGP</b></span>
-                                <span style="color:#64748b;">رصيدك: <b style="color:#4f46e5;">${currentBalance.toFixed(2)}</b></span>
-                            </div>
-
-                            <label style="font-size:11px; font-weight:700; color:var(--navy-bg);">الرابط</label>
-                            <input id="swal-link" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px; outline:none; font-size:13px;" placeholder="ضع الرابط هنا">
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, query, orderBy, limit, getDocs, doc, onSnapshot, addDoc, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
+    // إعدادات Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
         authDomain: "iskekd-1.firebaseapp.com",
@@ -367,78 +203,131 @@ onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let allServices = []; // لتخزين الخدمات المحملة حالياً
+    // متغيرات الحالة العالمية
+    let allServices = []; 
+    let currentBalance = 0;
 
-    onAuthStateChanged(auth, async (user) => {
+    // 1. مراقبة حالة المستخدم والرصيد لحظياً (Live Balance)
+    onAuthStateChanged(auth, (user) => {
         if (user) {
-            // مراقبة الرصيد لحظياً (خفيفة ولا تسبب ثقل)
+            // تحديث الرصيد والاسم تلقائياً عند أي تغيير في قاعدة البيانات
             onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
-                    document.getElementById('myBalance').innerText = (userData.balance || 0).toFixed(2) + " EGP";
+                    currentBalance = parseFloat(userData.balance) || 0;
+                    
+                    // تحديث العناصر في الواجهة
+                    const balanceEl = document.getElementById('myBalance');
+                    if (balanceEl) balanceEl.innerText = currentBalance.toFixed(2) + " EGP";
+                    
+                    const nameEl = document.getElementById('userName');
+                    if (nameEl) nameEl.innerText = userData.name || "مستخدم";
                 }
             });
-
             document.body.style.opacity = "1";
-            loadInitialServices(); // تحميل الخدمات الأساسية عند الفتح
+            loadServices();
         } else {
             window.location.href = "login.html";
         }
     });
 
-    // تحميل الخدمات الأولية مع تحديد عدد معين (Limit) لمنع التهنيج
-    async function loadInitialServices() {
-        try {
-            const q = query(collection(db, "Services"), limit(50));
-            const snap = await getDocs(q);
+    // 2. جلب الخدمات وتجهيز الفلاتر
+    function loadServices() {
+        const q = query(collection(db, "Services"), orderBy("category", "asc"));
+        onSnapshot(q, (snap) => {
             allServices = [];
+            const catFilter = document.getElementById('catFilter');
+            const categories = new Set();
+            
             snap.forEach(doc => {
-                allServices.push({ id: doc.id, ...doc.data() });
+                const data = doc.data();
+                allServices.push({ 
+                    id: doc.id, 
+                    ...data, 
+                    price: parseFloat(data.price) || 0 
+                });
+                if(data.category) categories.add(data.category);
             });
-            renderServices(allServices);
-            renderRandomServices(allServices);
-            loadCategories(); // تحميل التصنيفات للقائمة المنسدلة
-        } catch (e) { console.error("Error Loading Services:", e); }
-    }
 
-    // جلب التصنيفات مرة واحدة فقط لملء الـ Select Box
-    async function loadCategories() {
-        const snap = await getDocs(collection(db, "Services"));
-        const categories = new Set();
-        snap.forEach(doc => { if(doc.data().category) categories.add(doc.data().category); });
-        const catFilter = document.getElementById('catFilter');
-        catFilter.innerHTML = '<option value="all">كل التصنيفات</option>';
-        categories.forEach(cat => {
-            catFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+            // تحديث القائمة المنسدلة التقليدية
+            if(catFilter) {
+                catFilter.innerHTML = '<option value="all">كل التصنيفات</option>';
+                categories.forEach(cat => {
+                    catFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+                });
+            }
+            
+            // عرض الخدمات (الكل افتراضياً)
+            renderServices(allServices);
+            if (typeof renderRandomServices === "function") renderRandomServices(allServices);
         });
     }
 
-    // رسم الخدمات في الجدول
-    window.renderServices = function(data) {
-        const container = document.getElementById('services-container');
-        container.innerHTML = "";
-        let currentCat = "";
+    // 3. دالة الفلترة بالأيقونات (Platforms Filter)
+    window.filterByPlatform = (platform, element) => {
+    // تغيير شكل الأيقونة النشطة
+    document.querySelectorAll('.p-icon').forEach(icon => icon.classList.remove('active'));
+    if(element) element.classList.add('active');
 
-        data.forEach(s => {
-            if(s.category !== currentCat) {
-                currentCat = s.category;
-                container.innerHTML += `<div class="cat-title-row"><i class="fas fa-layer-group"></i> ${s.category.toUpperCase()}</div>`;
-            }
+    // الفلترة الذكية (تبحث عن الكلمة داخل اسم القسم)
+    const filtered = (platform === 'all') 
+        ? allServices 
+        : allServices.filter(s => s.category && s.category.toLowerCase().includes(platform.toLowerCase()));
+
+    renderServices(filtered);
+};
+
+
+    // 4. عرض الخدمات في الواجهة
+    window.renderServices = (data) => {
+        const container = document.getElementById('services-container');
+        if(!container) return;
+        container.innerHTML = ''; 
+
+        if (data.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center; width:100%;">لا توجد خدمات حالياً</div>';
+            return;
+        }
+
+        data.forEach(service => {
             container.innerHTML += `
-                <div class="service-row" onclick="core.openOrder('${s.id}', '${s.name}', ${s.price})">
-                    <div class="s-id">#${s.id.substring(0,4)}</div>
-                    <div class="s-name">${s.name} <br> <small style="color:var(--main-blue)">${s.price || 0} EGP / 1000</small></div>
-                </div>`;
+                <div class="service-row" onclick="core.openOrder('${service.id}', '${service.name}', ${service.price})">
+                    <div class="s-id">${service.id.substring(0, 4)}</div>
+                    <div class="s-name">
+                        ${service.name} 
+                        <div style="font-size:11px; color:var(--main-blue); font-weight:700;">${service.price} EGP / 1000</div>
+                    </div>
+                </div>
+            `;
         });
     };
 
-    // رسم الخدمات المقترحة (Random)
-    window.renderRandomServices = function(data) {
+    // 5. نظام البحث السريع
+    window.searchServices = () => {
+        const term = document.getElementById('searchInput').value.toLowerCase();
+        const filtered = allServices.filter(s => 
+            s.name.toLowerCase().includes(term) || 
+            (s.category && s.category.toLowerCase().includes(term))
+        );
+        renderServices(filtered);
+    };
+
+    // 6. التحكم في القائمة الجانبية (Sidebar)
+    window.toggleMenu = () => {
+        document.getElementById('sidebar').classList.toggle('active');
+        document.getElementById('overlay').classList.toggle('active');
+    };
+
+    // 7. تسجيل الخروج
+    window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
+
+    // 8. خدمات عشوائية (مقترحات)
+    window.renderRandomServices = (data) => {
         const randomContainer = document.getElementById('random-container');
-        if(!randomContainer) return;
+        if(!randomContainer || data.length === 0) return;
         randomContainer.innerHTML = "";
-        const shuffled = [...data].sort(() => 0.5 - Math.random());
-        shuffled.slice(0, 3).forEach(s => {
+        const shuffled = [...data].sort(() => 0.5 - Math.random()).slice(0, 3);
+        shuffled.forEach(s => {
             randomContainer.innerHTML += `
                 <div class="service-row" style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:8px;" onclick="core.openOrder('${s.id}', '${s.name}', ${s.price})">
                     <div class="s-id"><i class="fas fa-bolt" style="color:#f59e0b"></i></div>
@@ -447,135 +336,76 @@ onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
         });
     };
 
-    // فلترة حسب التصنيف
-    window.filterByCategory = async function() {
-        const val = document.getElementById('catFilter').value;
-        if(val === 'all') { loadInitialServices(); return; }
-        
-        const q = query(collection(db, "Services"), where("category", "==", val), limit(100));
-        const snap = await getDocs(q);
-        let results = [];
-        snap.forEach(doc => results.push({id: doc.id, ...doc.data()}));
-        renderServices(results);
-    };
-
-    // فلترة حسب المنصة (Icons)
-    window.filterByPlatform = async function(plat, el) {
-        document.querySelectorAll('.p-icon').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-        
-        if(plat === 'all') { loadInitialServices(); return; }
-        
-        const q = query(collection(db, "Services"), where("platform", "==", plat), limit(100));
-        const snap = await getDocs(q);
-        let results = [];
-        snap.forEach(doc => results.push({id: doc.id, ...doc.data()}));
-        renderServices(results);
-    };
-
-    // البحث الذكي
-    window.searchServices = async () => {
-        const term = document.getElementById('searchInput').value;
-        if(term.length < 3) {
-            if(term.length === 0) loadInitialServices();
-            return;
-        }
-
-        const q = query(collection(db, "Services"), where("name", ">=", term), limit(30));
-        const snap = await getDocs(q);
-        let results = [];
-        snap.forEach(doc => results.push({id: doc.id, ...doc.data()}));
-        renderServices(results);
-    };
-
-    window.toggleMenu = () => {
-        document.getElementById('sidebar').classList.toggle('active');
-        document.getElementById('overlay').classList.toggle('active');
-    };
-
-    window.logout = () => signOut(auth).then(() => window.location.href = "login.html");
-
-    // نظام فتح الطلب والتنفيذ (Core)
+    // 9. قلب النظام (معالجة الطلبات والحاسبة)
     window.core = {
         openOrder: async (id, name, price) => {
-            // جلب بيانات الخدمة كاملة للتفاصيل
-            const serviceDoc = await getDoc(doc(db, "Services", id));
-            const s = serviceDoc.data();
-            const currentBalance = parseFloat(document.getElementById('myBalance').innerText) || 0;
-
+            const s = allServices.find(item => item.id === id);
             Swal.fire({
-                title: `<div style="font-size:16px; font-weight:900; color:var(--navy-bg);">${name}</div>`,
+                title: `<div style="font-size:16px; font-weight:900; color:#1e2746;">${name}</div>`,
                 html: `
-                    <div style="text-align:right; direction:rtl; font-family:'Noto Kufi Arabic';">
+                    <div style="text-align:right; direction:rtl;">
                         <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:15px;">
                             <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-bolt" style="color:#f59e0b; font-size:12px;"></i>
                                 <div style="font-size:9px; color:#64748b;">السرعة</div>
                                 <div style="font-size:10px; font-weight:700;">${s.speed || 'سريع'}</div>
                             </div>
                             <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-shield-alt" style="color:#10b981; font-size:12px;"></i>
                                 <div style="font-size:9px; color:#64748b;">الضمان</div>
                                 <div style="font-size:10px; font-weight:700;">${s.refill || 'لا يوجد'}</div>
                             </div>
                             <div style="background:#f8fafc; padding:8px 4px; border-radius:10px; border:1px solid #e2e8f0; text-align:center;">
-                                <i class="fas fa-check-circle" style="color:#4f46e5; font-size:12px;"></i>
                                 <div style="font-size:9px; color:#64748b;">الثبات</div>
                                 <div style="font-size:10px; font-weight:700;">${s.stability || 'ثابت'}</div>
                             </div>
                         </div>
-
-                        <div style="background:#fff; border:1px solid var(--border-color); padding:12px; border-radius:12px;">
+                        <div style="background:#fff; border:1px solid #e2e8f0; padding:12px; border-radius:12px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:12px;">
                                 <span style="color:#64748b;">سعر الـ 1000: <b style="color:#10b981;">${price} EGP</b></span>
                                 <span style="color:#64748b;">رصيدك: <b style="color:#4f46e5;">${currentBalance.toFixed(2)}</b></span>
                             </div>
-
-                            <label style="font-size:11px; font-weight:700; color:var(--navy-bg);">الرابط</label>
+                            <label style="font-size:11px; font-weight:700;">الرابط</label>
                             <input id="swal-link" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; margin-bottom:10px; outline:none; font-size:13px;" placeholder="ضع الرابط هنا">
-
-                            <label style="font-size:11px; font-weight:700; color:var(--navy-bg);">الكمية (أدنى ${s.min || 10} - أقصى ${s.max || 10000})</label>
+                            <label style="font-size:11px; font-weight:700;">الكمية</label>
                             <input id="swal-qty" type="number" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; outline:none; font-size:13px;" placeholder="أدخل الكمية" oninput="window.calcOrderCost(${price}, ${currentBalance})">
                         </div>
-
-                        <div id="cost-box" style="margin-top:15px; background:var(--navy-bg); color:white; padding:10px; border-radius:12px; text-align:center;">
+                        <div id="cost-box" style="margin-top:15px; background:#1e2746; color:white; padding:10px; border-radius:12px; text-align:center; transition: 0.3s;">
                             <span style="font-size:11px; opacity:0.8;">إجمالي التكلفة</span>
                             <div style="font-size:18px; font-weight:900;"><span id="total-cost">0.00</span> EGP</div>
                         </div>
                         <div id="balance-error" style="color:#ef4444; font-size:10px; font-weight:bold; margin-top:8px; text-align:center; display:none;">⚠️ رصيدك لا يكفي لإتمام الطلب</div>
                     </div>
                 `,
-                showCancelButton: true,
-                confirmButtonText: 'تأكيد الطلب',
-                cancelButtonText: 'إلغاء',
-                confirmButtonColor: '#4f46e5',
-                customClass: { popup: 'my-swal-popup', confirmButton: 'my-confirm-btn', cancelButton: 'my-cancel-btn' },
+                showCancelButton: true, confirmButtonText: 'تأكيد الطلب', cancelButtonText: 'إلغاء', confirmButtonColor: '#4f46e5',
                 preConfirm: () => {
                     const confirmBtn = Swal.getConfirmButton();
-                    if (confirmBtn.getAttribute('data-action') === 'recharge') {
-                        window.location.href = "add-funds.html";
-                        return false;
+                    if (confirmBtn.getAttribute('data-action') === 'recharge') { 
+                        window.location.href = "add-funds.html"; 
+                        return false; 
                     }
                     const link = document.getElementById('swal-link').value;
                     const qty = document.getElementById('swal-qty').value;
                     const totalCost = (qty / 1000) * price;
-                    if (!link || !qty || qty <= 0) { Swal.showValidationMessage('يرجى ملء البيانات'); return false; }
-                    if (totalCost > currentBalance) { return false; }
+                    
+                    if (!link || !qty || qty <= 0) { 
+                        Swal.showValidationMessage('يرجى ملء كافة البيانات المطلوبة'); 
+                        return false; 
+                    }
+                    if (totalCost > currentBalance) return false;
+                    
                     return { link, qty, totalCost };
                 }
             }).then(async (result) => {
                 if (result.isConfirmed && result.value) {
                     const { link, qty, totalCost } = result.value;
-                    const user = auth.currentUser;
                     try {
                         Swal.fire({ title: 'جاري تنفيذ طلبك...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                         
-                        const userRef = doc(db, "Users", user.uid);
+                        const userRef = doc(db, "Users", auth.currentUser.uid);
                         await updateDoc(userRef, { balance: currentBalance - totalCost });
-
+                        
                         await addDoc(collection(db, "Orders"), {
-                            userId: user.uid,
-                            userEmail: user.email,
+                            userId: auth.currentUser.uid,
+                            userEmail: auth.currentUser.email,
                             serviceName: name,
                             link: link,
                             quantity: qty,
@@ -583,42 +413,59 @@ onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
                             status: "pending",
                             createdAt: new Date().toISOString()
                         });
-
-                        Swal.fire({ icon: 'success', title: 'تم إرسال الطلب بنجاح', text: `تم خصم ${totalCost.toFixed(2)} EGP`, confirmButtonColor: '#4f46e5' });
-                    } catch (e) {
-                        Swal.fire('خطأ!', 'حدثت مشكلة أثناء معالجة الطلب', 'error');
+                        
+                        Swal.fire({ icon: 'success', title: 'تم إرسال الطلب بنجاح', text: `تم خصم ${totalCost.toFixed(2)} EGP من رصيدك` });
+                    } catch (e) { 
+                        console.error(e);
+                        Swal.fire('خطأ!', 'حدثت مشكلة أثناء معالجة الطلب', 'error'); 
                     }
                 }
             });
         }
     };
 
+    // 10. دالة حساب التكلفة والتحقق من الرصيد (Real-time Calculator)
     window.calcOrderCost = (price, balance) => {
         const qty = document.getElementById('swal-qty').value || 0;
         const total = (qty / 1000) * price;
-        const costDisplay = document.getElementById('total-cost');
+        const confirmBtn = Swal.getConfirmButton();
         const costBox = document.getElementById('cost-box');
         const errorMsg = document.getElementById('balance-error');
-        const confirmBtn = Swal.getConfirmButton();
-
-        costDisplay.innerText = total.toFixed(2);
-
+        
+        document.getElementById('total-cost').innerText = total.toFixed(2);
+        
         if (total > balance) {
             costBox.style.background = "#ef4444";
             errorMsg.style.display = "block";
             confirmBtn.innerText = "شحن رصيد الآن";
-            confirmBtn.style.background = "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)";
             confirmBtn.setAttribute('data-action', 'recharge');
         } else {
-            costBox.style.background = "var(--navy-bg)";
+            costBox.style.background = "#1e2746";
             errorMsg.style.display = "none";
             confirmBtn.innerText = "تأكيد الطلب";
-            confirmBtn.style.background = "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)";
             confirmBtn.removeAttribute('data-action');
         }
     };
-</script>
 
+// أضف هذه الأسطر في آخر الكود لربط الأزرار بالسكربت
+window.searchServices = () => {
+    const term = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = allServices.filter(s => 
+        s.name.toLowerCase().includes(term) || 
+        (s.category && s.category.toLowerCase().includes(term)) ||
+        s.id.includes(term)
+    );
+    renderServices(filtered);
+};
+
+// ربط القائمة المنسدلة (Select Box) بالسكربت
+window.filterByCategory = () => {
+    const val = document.getElementById('catFilter').value;
+    window.filterByPlatform(val, null);
+};
+
+
+    </script>
 
 </body>
 </html>
