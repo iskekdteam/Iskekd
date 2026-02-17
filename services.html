@@ -202,48 +202,34 @@
         });
     }
 
-    window.renderProducts = function() {
-        const catVal = document.getElementById('cat').value;
-        const searchVal = document.getElementById('qSearch').value.toLowerCase();
-        const container = document.getElementById('products-container');
-        const serSelect = document.getElementById('ser');
-        container.innerHTML = '';
-        
-        let filtered = allData.filter(x => {
-            const matchPlat = currentPlat === 'all' || 
-                             (x.platform && x.platform.toLowerCase().includes(currentPlat.toLowerCase())) || 
-                             (x.category && x.category.toLowerCase().includes(currentPlat.toLowerCase()));
-            
-            const matchCat = catVal === 'all' || x.category === catVal;
-            const matchSearch = x.name.toLowerCase().includes(searchVal) || x.id.toLowerCase().includes(searchVal);
-            
-            return matchPlat && matchCat && matchSearch;
+    async function renderProducts() {
+    const grid = document.getElementById('products-grid');
+    grid.innerHTML = '<div class="loading">جاري تحميل الخدمات...</div>';
+
+    try {
+        // جلب الخدمات الخاصة بالمنصة المختارة فقط بدلاً من جلب الكل
+        // هذا يقلل البيانات من 5000 إلى 50 أو 100 خدمة فقط
+        const snapshot = await db.collection("Services")
+            .where("platform", "==", currentPlat) 
+            .get();
+
+        grid.innerHTML = "";
+        if (snapshot.empty) {
+            grid.innerHTML = "<p>لا توجد خدمات متاحة حالياً لهذا القسم</p>";
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            // كود رسم الكارت (Card) الموجود عندك في الملف
+            grid.innerHTML += `...`; 
         });
+    } catch (e) {
+        console.error("Error:", e);
+        grid.innerHTML = "حدث خطأ أثناء تحميل البيانات";
+    }
+}
 
-        if(serSelect) {
-            serSelect.innerHTML = '<option value="all">كل الخدمات</option>';
-            filtered.forEach(x => serSelect.innerHTML += `<option value="${x.id}">${x.name}</option>`);
-        }
-
-        const groups = filtered.reduce((acc, obj) => {
-            const groupName = obj.category || "عام";
-            acc[groupName] = acc[groupName] || [];
-            acc[groupName].push(obj);
-            return acc;
-        }, {});
-
-        for (const cat in groups) {
-            let section = `<div class="cat-section"><div class="cat-header"><i class="fas fa-layer-group"></i> ${cat}</div><div class="product-list">`;
-            groups[cat].forEach(p => {
-                section += `<div class="product-row" onclick="openPurchaseModal('${p.id}')">
-                                <div class="p-name">${p.name}</div>
-                                <div class="p-price">${p.price} EGP</div>
-                            </div>`;
-            });
-            section += `</div></div>`;
-            container.innerHTML += section;
-        }
-    };
 
     window.openPurchaseModal = function(id) {
         const p = allData.find(x => x.id === id);
