@@ -113,10 +113,41 @@
         <a href="index.html" class="side-link" style="color:#f87171;"><i class="fas fa-sign-out-alt"></i> خروج</a>
     </div>
 </div>
+<div class="main-container">
+    <div class="platform-grid">
+        <div class="p-item active" onclick="filterByPlatform(this, 'all')"><i class="fas fa-border-all"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'telegram')"><i class="fab fa-telegram-plane"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'instagram')"><i class="fab fa-instagram"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'tiktok')"><i class="fab fa-tiktok"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'facebook')"><i class="fab fa-facebook-f"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'youtube')"><i class="fab fa-youtube"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'web')"><i class="fas fa-globe"></i></div>
+        <div class="p-item" onclick="filterByPlatform(this, 'reddit')"><i class="fab fa-reddit"></i></div>
+    </div>
+
+    <div class="card">
+        <div class="search-area">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="ابحث عن خدمة أو ID..." oninput="applyAllFilters()">
+        </div>
+
+        <div class="f-group">
+            <span class="f-label">فلترة حسب الفئة</span>
+            <select id="cat" onchange="applyAllFilters()"></select>
+        </div>
+    </div>
+
+    <div id="products-container">
+        <p style="text-align:center; padding:40px; color:#64748b;">اختر منصة أو ابحث عن خدمة لتبدأ...</p>
+    </div>
+</div>
+
+
+
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { getFirestore, collection, query, where, limit, getDocs, doc, onSnapshot, updateDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, doc, onSnapshot, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBXQkooc3Tnq4vAVJq_Tlk4PypB37cpeXc",
@@ -131,194 +162,109 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     
-    let allData = []; // للبيانات المعروضة حالياً فقط
-    let currentPlat = 'all';
+    let allServices = []; // المخزن الرئيسي لكل الخدمات
     let userBalance = 0;
     let currentUser = null;
+    let currentPlat = 'all';
 
+    // 1. مراقبة حالة المستخدم والرصيد
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             // مراقبة الرصيد لحظياً
             onSnapshot(doc(db, "Users", user.uid), (snap) => {
                 if (snap.exists()) {
-                    userBalance = snap.data().balance || 0;
+                    userBalance = parseFloat(snap.data().balance) || 0;
+                    // تحديث الرصيد في الواجهة إذا كان عندك عنصر له id="user-balance"
+                    const balEl = document.getElementById('user-balance');
+                    if(balEl) balEl.innerText = userBalance.toFixed(2);
                 }
             });
-            loadCategories(); // جلب الأقسام فقط في البداية
-            renderProducts(); // تحميل أولي سريع
+            initialLoad();
         } else {
             window.location.href = "login.html";
         }
     });
 
-    // جلب الأقسام لملء القائمة المنسدلة (مرة واحدة فقط)
-    async function loadCategories() {
-        const snap = await getDocs(collection(db, "Services"));
-        const cats = new Set();
-        snap.forEach(d => { if(d.data().category) cats.add(d.data().category); });
-        const el = document.getElementById('cat');
-        if(el) {
-            el.innerHTML = '<option value="all">كل الأقسام</option>';
-            cats.forEach(v => el.innerHTML += `<option value="${v}">${v}</option>`);
+    // 2. جلب البيانات الأولي وتخزينها
+    async function initialLoad() {
+        try {
+            const snap = await getDocs(collection(db, "Services"));
+            allServices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+            // تحديث قائمة الأقسام (Dropdown)
+            updateCategoriesMenu();
+            
+            // عرض رسالة ترحيب أو عينة بسيطة
+            renderProducts('all'); 
+        } catch (e) {
+            console.error("Error loading services:", e);
         }
     }
 
-    // دالة عرض المنتجات الذكية
-    async function renderProducts() {
+    // 3. تحديث قائمة الأقسام في الـ HTML
+    function updateCategoriesMenu() {
+        const cats = [...new Set(allServices.map(s => s.category))];
+        const el = document.getElementById('cat');
+        if (el) {
+            el.innerHTML = '<option value="all">كل الأقسام</option>';
+            cats.forEach(c => {
+                if(c) el.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+        }
+    }
+
+    // 4. المحرك الرئيسي للعرض والفلترة (تم تطويره لمنع التهنيج)
+    window.renderProducts = function() {
         const container = document.getElementById('products-container');
-        container.innerHTML = '<div style="text-align:center; padding:20px;">جاري تحميل الخدمات...</div>';
-        
-        const qSearch = document.getElementById('qSearch').value.toLowerCase();
-        const selectedCat = document.getElementById('cat').value;
+        const searchVal = document.getElementById('searchInput')?.value.toLowerCase() || "";
+        const catVal = document.getElementById('cat')?.value || "all";
 
-        try {
-            let q;
-            // بناء الاستعلام بناءً على الاختيارات لتقليل البيانات
-            if (currentPlat !== 'all') {
-                q = query(collection(db, "Services"), where("platform", "==", currentPlat), limit(60));
-            } else if (selectedCat !== 'all') {
-                q = query(collection(db, "Services"), where("category", "==", selectedCat), limit(60));
-            } else if (qSearch.length >= 3) {
-                q = query(collection(db, "Services"), where("name", ">=", qSearch), limit(30));
-            } else {
-                q = query(collection(db, "Services"), limit(40)); // تحميل عشوائي خفيف عند البداية
-            }
+        // تصفية المصفوفة في الذاكرة (سريع جداً)
+        let filtered = allServices.filter(s => {
+            const matchPlat = (currentPlat === 'all' || s.platform === currentPlat);
+            const matchCat = (catVal === 'all' || s.category === catVal);
+            const matchSearch = (s.name.toLowerCase().includes(searchVal) || String(s.id).includes(searchVal));
+            return matchPlat && matchCat && matchSearch;
+        });
 
-            const snap = await getDocs(q);
-            allData = [];
-            container.innerHTML = "";
-            
-            if (snap.empty) {
-                container.innerHTML = '<div style="text-align:center; padding:20px;">لا توجد خدمات تطابق اختيارك</div>';
-                return;
-            }
+        container.innerHTML = '';
+        if (filtered.length === 0) {
+            container.innerHTML = '<p style="text-align:center; padding:40px; color:#64748b;">لا توجد خدمات مطابقة لبحثك</p>';
+            return;
+        }
 
-            let currentCategoryHeader = "";
-            snap.forEach(d => {
-                const p = {id: d.id, ...d.data()};
-                allData.push(p);
+        // تقسيم النتائج لمجموعات حسب القسم (أول 60 نتيجة فقط للسرعة)
+        const limitResults = filtered.slice(0, 60);
+        const groups = limitResults.reduce((acc, obj) => {
+            const key = obj.category || "عام";
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(obj);
+            return acc;
+        }, {});
 
-                // إضافة عنوان القسم إذا تغير
-                if (p.category !== currentCategoryHeader) {
-                    currentCategoryHeader = p.category;
-                    container.innerHTML += `<div class="cat-header">${p.category}</div>`;
-                }
-
-                container.innerHTML += `
-                    <div class="product-row" onclick="openPurchaseModal('${p.id}')">
-                        <div class="p-name">${p.name}</div>
-                        <div class="p-price">${p.price} EGP</div>
+        for (const catName in groups) {
+            let section = `
+                <div class="cat-section" style="margin-bottom:20px;">
+                    <div class="cat-header" style="background:#f1f5f9; padding:10px; font-weight:bold; border-radius:8px; margin-bottom:10px;">
+                        <i class="fas fa-layer-group"></i> ${catName}
+                    </div>
+                    <div class="product-list">
+            `;
+            groups[catName].forEach(p => {
+                section += `
+                    <div class="product-row" onclick="openPurchaseModal('${p.id}')" style="display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid #eee; cursor:pointer;">
+                        <div class="p-name">#${p.id} - ${p.name}</div>
+                        <div class="p-price" style="font-weight:bold; color:#2563eb;">${p.price} EGP</div>
                     </div>
                 `;
             });
-        } catch (e) {
-            console.error(e);
-            container.innerHTML = "حدث خطأ أثناء تحميل البيانات";
+            section += `</div></div>`;
+            container.innerHTML += section;
         }
-    }
-
-    window.openPurchaseModal = function(id) {
-        const p = allData.find(x => x.id === id);
-        if (!p) return;
-
-        Swal.fire({
-            title: `<div style="font-size:18px; font-weight:900;">${p.name}</div>`,
-            html: `
-                <div style="text-align:right; direction:rtl; font-family:'Noto Kufi Arabic';">
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:15px;">
-                        <div style="background:#f0f7ff; padding:10px 5px; border-radius:12px; border:1px solid #e0e7ff; text-align:center;">
-                            <div style="font-size:9px; color:#64748b;">السرعة</div>
-                            <div style="font-size:10px; font-weight:700;">${p.speed || 'سريع'}</div>
-                        </div>
-                        <div style="background:#f0fff4; padding:10px 5px; border-radius:12px; border:1px solid #dcfce7; text-align:center;">
-                            <div style="font-size:9px; color:#64748b;">الضمان</div>
-                            <div style="font-size:10px; font-weight:700;">${p.refill || 'لا يوجد'}</div>
-                        </div>
-                        <div style="background:#fffcf0; padding:10px 5px; border-radius:12px; border:1px solid #fef3c7; text-align:center;">
-                            <div style="font-size:9px; color:#64748b;">الثبات</div>
-                            <div style="font-size:10px; font-weight:700;">${p.stability || 'مرتفع'}</div>
-                        </div>
-                    </div>
-                    <label style="font-size:12px; font-weight:700; color:#64748b;">رابط الحساب / المنشور</label>
-                    <input type="text" id="swal-link" style="width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:10px; margin-bottom:12px; outline:none; text-align:right;" placeholder="https://...">
-                    <label style="font-size:12px; font-weight:700; color:#64748b;">الكمية (أقل شيء ${p.min || 10})</label>
-                    <input type="number" id="swal-qty" style="width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:10px; margin-bottom:12px; outline:none; text-align:right;" placeholder="أدخل الكمية">
-                    <div id="cost-box" style="background:#1e2746; color:white; padding:15px; border-radius:12px; text-align:center;">
-                        <div style="font-size:11px; opacity:0.8;">التكلفة الإجمالية</div>
-                        <div style="font-size:22px; font-weight:900;"><span id="total-cost">0.00</span> EGP</div>
-                    </div>
-                    <div id="balance-error" style="color:#ef4444; font-size:11px; font-weight:700; text-align:center; margin-top:10px; display:none;">⚠️ رصيدك غير كافٍ</div>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'تأكيد الطلب',
-            cancelButtonText: 'إلغاء',
-            didOpen: () => {
-                const qtyInput = document.getElementById('swal-qty');
-                qtyInput.addEventListener('input', () => {
-                    const total = (qtyInput.value / 1000) * p.price;
-                    document.getElementById('total-cost').innerText = total.toFixed(2);
-                    const confirmBtn = Swal.getConfirmButton();
-                    if (total > userBalance) {
-                        document.getElementById('cost-box').style.background = "#ef4444";
-                        document.getElementById('balance-error').style.display = "block";
-                        confirmBtn.innerText = "شحن رصيد";
-                        confirmBtn.setAttribute('data-action', 'recharge');
-                    } else {
-                        document.getElementById('cost-box').style.background = "#1e2746";
-                        document.getElementById('balance-error').style.display = "none";
-                        confirmBtn.innerText = "تأكيد الطلب";
-                        confirmBtn.removeAttribute('data-action');
-                    }
-                });
-            },
-            preConfirm: () => {
-                const btn = Swal.getConfirmButton();
-                if (btn.getAttribute('data-action') === 'recharge') {
-                    window.location.href = "add-funds.html";
-                    return false;
-                }
-                const link = document.getElementById('swal-link').value;
-                const qty = document.getElementById('swal-qty').value;
-                if (!link || qty <= 0) {
-                    Swal.showValidationMessage('يرجى إدخال الرابط والكمية');
-                    return false;
-                }
-                return { link, qty, cost: (qty / 1000) * p.price };
-            }
-        }).then((result) => {
-            if (result.isConfirmed) processOrder(result.value, p.name);
-        });
     };
 
-    async function processOrder(data, serviceName) {
-        try {
-            Swal.fire({ title: 'جاري تنفيذ طلبك...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            
-            const currentBal = Number(userBalance);
-            const orderCost = Number(data.cost);
-
-            if (currentBal < orderCost) throw new Error("رصيدك غير كافٍ");
-
-            await updateDoc(doc(db, "Users", currentUser.uid), { balance: currentBal - orderCost });
-            await addDoc(collection(db, "Orders"), {
-                userId: currentUser.uid,
-                email: currentUser.email,
-                service: serviceName,
-                link: data.link,
-                quantity: Number(data.qty),
-                cost: orderCost,
-                status: "pending",
-                createdAt: new Date().toISOString()
-            });
-
-            Swal.fire('تم بنجاح', 'تم تسجيل طلبك بنجاح', 'success');
-        } catch (e) {
-            Swal.fire('خطأ', e.message, 'error');
-        }
-    }
-
+    // 5. وظائف المنصات (الأيقونات)
     window.plat = (el, type) => {
         document.querySelectorAll('.p-item').forEach(i => i.classList.remove('active'));
         el.classList.add('active');
@@ -326,8 +272,72 @@
         renderProducts();
     };
 
-    window.renderProducts = renderProducts; // لربطها بالـ HTML
+    // 6. نافذة الشراء
+    window.openPurchaseModal = function(id) {
+        const p = allServices.find(x => x.id === id);
+        if (!p) return;
+
+        Swal.fire({
+            title: `<div style="font-size:16px;">${p.name}</div>`,
+            html: `
+                <div style="text-align:right; direction:rtl;">
+                    <label style="font-size:12px; color:#64748b;">رابط الخدمة</label>
+                    <input type="text" id="swal-link" class="swal2-input" style="width:90%;" placeholder="ضع الرابط هنا">
+                    <label style="font-size:12px; color:#64748b;">الكمية (أقل كمية: ${p.min || 10})</label>
+                    <input type="number" id="swal-qty" class="swal2-input" style="width:90%;" oninput="window.updateCost(${p.price})">
+                    <div id="cost-box" style="background:#0f172a; color:#fff; padding:15px; border-radius:10px; margin-top:15px; text-align:center;">
+                        <span style="font-size:12px; opacity:0.8;">التكلفة الإجمالية:</span><br>
+                        <strong style="font-size:20px;"><span id="total-cost">0.00</span> EGP</strong>
+                    </div>
+                </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'تأكيد الطلب',
+            cancelButtonText: 'إلغاء',
+            preConfirm: () => {
+                const link = document.getElementById('swal-link').value;
+                const qty = parseInt(document.getElementById('swal-qty').value);
+                const cost = (qty / 1000) * p.price;
+                if (!link || !qty || qty <= 0) return Swal.showValidationMessage('يرجى إدخال الرابط والكمية');
+                if (cost > userBalance) return Swal.showValidationMessage('رصيدك غير كافٍ (تحتاج ' + cost.toFixed(2) + ')');
+                return { link, qty, cost };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) processOrder(result.value, p.name);
+        });
+    };
+
+    window.updateCost = (price) => {
+        const qty = document.getElementById('swal-qty').value || 0;
+        const total = (qty / 1000) * price;
+        document.getElementById('total-cost').innerText = total.toFixed(2);
+    };
+
+    async function processOrder(data, serviceName) {
+        try {
+            Swal.fire({ title: 'جاري معالجة طلبك...', didOpen: () => Swal.showLoading() });
+            
+            // خصم الرصيد وإضافة الطلب في عملية واحدة
+            await updateDoc(doc(db, "Users", currentUser.uid), { balance: userBalance - data.cost });
+            await addDoc(collection(db, "Orders"), {
+                userId: currentUser.uid,
+                service: serviceName,
+                link: data.link,
+                quantity: data.qty,
+                cost: data.cost,
+                status: "pending",
+                createdAt: new Date().toISOString()
+            });
+
+            Swal.fire('تم بنجاح!', 'تم استلام طلبك وهو قيد التنفيذ', 'success');
+        } catch (e) {
+            Swal.fire('خطأ', 'فشلت العملية، حاول لاحقاً', 'error');
+        }
+    }
+
+    // ربط البحث (searchInput) بالدالة
+    document.getElementById('searchInput')?.addEventListener('input', renderProducts);
     window.toggleSide = () => document.getElementById('side').classList.toggle('open');
+
 </script>
 
 
