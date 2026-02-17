@@ -226,17 +226,23 @@
     });
 
     // 3. جلب الخدمات الأولي (Limit 30 لتوفير القراءات)
-    async function loadServices() {
-        try {
-            const q = query(collection(db, "Services"), limit(30));
-            const snap = await getDocs(q);
-            allServices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // تعديل الدالة لتكون مخزن فقط في البداية
+async function loadServices() {
+    try {
+        // جلب كل الخدمات مرة واحدة وتخزينها محلياً (بدل الطلب المتكرر من السيرفر)
+        const snap = await getDocs(collection(db, "Services"));
+        allServices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // عرض المقترحات فقط عند الفتح
+        renderRandomServices(allServices);
+        
+        // إظهار رسالة بسيطة للمستخدم في مكان الجدول
+        document.getElementById('services-container').innerHTML = 
+            '<p style="text-align:center; padding:40px; color:#64748b;">اختر منصة من الأعلى أو ابحث عن خدمة لتبدأ...</p>';
             
-            renderServices(allServices);
-            renderRandomServices(allServices);
-            loadCategoriesOnce(); 
-        } catch (e) { console.error("Error loading services:", e); }
-    }
+        loadCategoriesOnce(allServices); 
+    } catch (e) { console.error("Error loading services:", e); }
+}
 
     // 4. جلب التصنيفات للقائمة المنسدلة
     async function loadCategoriesOnce() {
@@ -251,27 +257,21 @@
     }
 
     // 5. الفلترة حسب المنصة (طلب مباشر من Firebase)
-    window.filterByPlatform = async (platform, element) => {
-        if (element) {
-            document.querySelectorAll('.p-icon').forEach(icon => icon.classList.remove('active'));
-            element.classList.add('active');
-        }
+    window.filterByPlatform = (platform, element) => {
+    if (element) {
+        document.querySelectorAll('.p-icon').forEach(icon => icon.classList.remove('active'));
+        element.classList.add('active');
+    }
 
-        const container = document.getElementById('services-container');
-        container.innerHTML = '<p style="text-align:center; padding:20px;">جاري التحميل...</p>';
+    if (platform === 'all') {
+        renderServices(allServices.slice(0, 30)); // عرض عينة بسيطة
+        return;
+    }
 
-        let q;
-        if (platform === 'all') {
-            q = query(collection(db, "Services"), limit(30));
-        } else {
-            q = query(collection(db, "Services"), where("platform", "==", platform), limit(50));
-        }
-        
-        const snap = await getDocs(q);
-        const filtered = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        allServices = filtered; // تحديث البيانات المحلية للبحث
-        renderServices(filtered);
-    };
+    const filtered = allServices.filter(s => s.platform === platform);
+    renderServices(filtered.slice(0, 50)); // عرض أول 50 خدمة من المنصة دي
+};
+
 
     // 6. عرض الخدمات في الواجهة
     window.renderServices = (data) => {
@@ -296,16 +296,24 @@
     };
 
     // 7. البحث الذكي (محلي + سحابي)
-    window.searchServices = async () => {
-        const term = document.getElementById('searchInput').value.toLowerCase();
-        if (term.length === 0) { loadServices(); return; }
-        if (term.length < 3) return;
+    window.searchServices = () => {
+    const term = document.getElementById('searchInput').value.toLowerCase();
+    
+    if (term.length === 0) {
+        document.getElementById('services-container').innerHTML = '<p style="text-align:center; padding:40px;">ابدأ البحث...</p>';
+        return;
+    }
 
-        const q = query(collection(db, "Services"), where("name", ">=", term), limit(20));
-        const snap = await getDocs(q);
-        const results = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        renderServices(results);
-    };
+    // البحث في المصفوفة المخزنة محلياً
+    const results = allServices.filter(s => 
+        s.name.toLowerCase().includes(term) || 
+        (s.category && s.category.toLowerCase().includes(term)) ||
+        s.id.includes(term)
+    );
+
+    // عرض أول 40 نتيجة بس عشان الصفحة متهنجش مهما كانت النتائج كتير
+    renderServices(results.slice(0, 40));
+};
 
     // 8. القائمة الجانبية والخروج
     window.toggleMenu = () => {
