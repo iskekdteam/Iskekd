@@ -300,7 +300,7 @@ onSnapshot(doc(db, "Users", user.uid), (userDoc) => {
     // البحث في أول 50 نتيجة فقط تطابق الاسم
     const snapshot = await db.collection("Services")
         .where("name", ">=", term)
-        .limit(50) 
+        .limit(20) 
         .get();
         
     // رسم النتائج...
